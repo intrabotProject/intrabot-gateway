@@ -157,3 +157,29 @@ class FeedbackStatsResponse(BaseModel):
     positive: int
     negative: int
     recent: list[dict]
+
+
+class StagingDocumentSummary(BaseModel):
+    source: str
+    submitted_by: str
+    submitted_at: str
+    category: str
+    file_size_bytes: Optional[int] = None
+
+
+class StagingCountResponse(BaseModel):
+    count: int
+
+
+class RejectStagingResponse(BaseModel):
+    source: str
+    rejected: bool
+
+
+class UsageStatsResponse(BaseModel):
+    total_users: int
+    total_feedback: int
+    positive_feedback: int
+    negative_feedback: int
+    satisfaction_rate: float
+    users_by_role: dict[str, int]

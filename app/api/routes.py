@@ -8,6 +8,7 @@ from app.api.auth import get_user_role
 from app.api.deps import get_gateway_service
 from app.application.feedback_service import FeedbackService
 from app.application.gateway_service import GatewayService
+from app.application.usage_stats_service import UsageStatsService
 from app.domain.access_policy import (
     CATEGORY_LABELS,
     DOCUMENT_CATEGORIES,
@@ -26,15 +27,21 @@ from app.domain.models import (
     SearchRequest,
     SearchResponse,
     SubmitFeedbackBody,
+    UsageStatsResponse,
 )
 from app.infrastructure.clients import DownstreamError
 from app.infrastructure.database import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
 def get_feedback_service(db: Session = Depends(get_db)) -> FeedbackService:
     return FeedbackService(db)
+
+
+def get_usage_stats_service(db: Session = Depends(get_db)) -> UsageStatsService:
+    return UsageStatsService(db)
 
 
 async def _handle_downstream_error(coro):
@@ -134,6 +141,19 @@ async def chat(
 )
 async def ingest(service: GatewayService = Depends(get_gateway_service)) -> IngestResponse:
     return await _handle_downstream_error(service.ingest())
+
+
+@router.get(
+    "/api/v1/stats/usage",
+    response_model=UsageStatsResponse,
+    tags=["stats"],
+    summary="Statistiques d'usage de la plateforme",
+)
+async def usage_stats(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: UsageStatsService = Depends(get_usage_stats_service),
+) -> UsageStatsResponse:
+    return service.get_stats(include_role_breakdown=(current_user.role == "admin"))
 
 
 @router.post(

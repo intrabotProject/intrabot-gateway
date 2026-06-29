@@ -13,8 +13,11 @@ from app.domain.models import (
     HealthResponse,
     IngestResponse,
     ReindexDocumentResponse,
+    RejectStagingResponse,
     SearchRequest,
     SearchResponse,
+    StagingCountResponse,
+    StagingDocumentSummary,
 )
 from app.domain.access_policy import UserRole, get_allowed_categories
 from app.infrastructure.clients import DownstreamError, IngestionClient, SearchClient
@@ -94,6 +97,35 @@ class GatewayService:
     async def reindex_document(self, source: str) -> ReindexDocumentResponse:
         result = await self._ingestion.reindex_document(source)
         return ReindexDocumentResponse.model_validate(result)
+
+    async def submit_document(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        category: str,
+        submitted_by: str,
+    ) -> StagingDocumentSummary:
+        result = await self._ingestion.submit_document(
+            filename, content, content_type, category, submitted_by
+        )
+        return StagingDocumentSummary.model_validate(result)
+
+    async def list_staging(self) -> list[StagingDocumentSummary]:
+        result = await self._ingestion.list_staging()
+        return [StagingDocumentSummary.model_validate(item) for item in result]
+
+    async def count_staging(self) -> StagingCountResponse:
+        result = await self._ingestion.count_staging()
+        return StagingCountResponse.model_validate(result)
+
+    async def approve_staging(self, source: str) -> DocumentSummary:
+        result = await self._ingestion.approve_staging(source)
+        return DocumentSummary.model_validate(result)
+
+    async def reject_staging(self, source: str) -> RejectStagingResponse:
+        result = await self._ingestion.reject_staging(source)
+        return RejectStagingResponse.model_validate(result)
 
     async def health(self) -> HealthResponse:
         ingestion_status = await self._probe_service(self._ingestion.health)

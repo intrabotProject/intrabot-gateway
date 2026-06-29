@@ -119,6 +119,38 @@ class IngestionClient(_BaseClient):
         encoded_source = quote(source, safe="")
         return await self._post_json(f"/admin/documents/{encoded_source}/reindex")
 
+    async def submit_document(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        category: str,
+        submitted_by: str,
+    ) -> dict[str, Any]:
+        response = await self._request(
+            "POST",
+            "/staging/submit",
+            files={"file": (filename, content, content_type)},
+            data={"category": category, "submitted_by": submitted_by},
+        )
+        return response.json()
+
+    async def list_staging(self) -> list[dict[str, Any]]:
+        response = await self._request("GET", "/staging")
+        return response.json()
+
+    async def count_staging(self) -> dict[str, Any]:
+        return await self._get_json("/staging/count")
+
+    async def approve_staging(self, source: str) -> dict[str, Any]:
+        encoded_source = quote(source, safe="")
+        return await self._post_json(f"/staging/{encoded_source}/approve")
+
+    async def reject_staging(self, source: str) -> dict[str, Any]:
+        encoded_source = quote(source, safe="")
+        response = await self._request("DELETE", f"/staging/{encoded_source}")
+        return response.json()
+
 
 class SearchClient(_BaseClient):
     """Proxy HTTP vers intrabot-search (:8002)."""

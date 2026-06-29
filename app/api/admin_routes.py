@@ -19,6 +19,9 @@ from app.domain.models import (
     FeedbackStatsResponse,
     IngestResponse,
     ReindexDocumentResponse,
+    RejectStagingResponse,
+    StagingCountResponse,
+    StagingDocumentSummary,
     UpdateUserRoleBody,
     UserResponse,
 )
@@ -178,6 +181,48 @@ async def update_user_role(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return UserResponse(id=user.id, email=user.email, role=user.role)
+
+
+@router.get("/staging", response_model=list[StagingDocumentSummary])
+async def list_staging(
+    service: GatewayService = Depends(get_gateway_service),
+) -> list[StagingDocumentSummary]:
+    try:
+        return await service.list_staging()
+    except DownstreamError as exc:
+        raise _downstream_http_error(exc) from exc
+
+
+@router.get("/staging/count", response_model=StagingCountResponse)
+async def count_staging(
+    service: GatewayService = Depends(get_gateway_service),
+) -> StagingCountResponse:
+    try:
+        return await service.count_staging()
+    except DownstreamError as exc:
+        raise _downstream_http_error(exc) from exc
+
+
+@router.post("/staging/{source}/approve", response_model=DocumentSummary)
+async def approve_staging(
+    source: str,
+    service: GatewayService = Depends(get_gateway_service),
+) -> DocumentSummary:
+    try:
+        return await service.approve_staging(source)
+    except DownstreamError as exc:
+        raise _downstream_http_error(exc) from exc
+
+
+@router.delete("/staging/{source}", response_model=RejectStagingResponse)
+async def reject_staging(
+    source: str,
+    service: GatewayService = Depends(get_gateway_service),
+) -> RejectStagingResponse:
+    try:
+        return await service.reject_staging(source)
+    except DownstreamError as exc:
+        raise _downstream_http_error(exc) from exc
 
 
 @router.get("/feedback/stats", response_model=FeedbackStatsResponse)
