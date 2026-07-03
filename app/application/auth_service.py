@@ -20,10 +20,13 @@ class AuthError(Exception):
 
 
 class AuthService:
+    """Gère l'inscription, la connexion et les jetons JWT."""
+
     def __init__(self, db: Session) -> None:
         self._users = UserRepository(db)
 
     def register(self, email: str, password: str, role: str) -> UserRecord:
+        """Crée un compte utilisateur avec validation e-mail, mot de passe et rôle."""
         normalized_email = email.strip().lower()
         if not normalized_email or "@" not in normalized_email:
             raise AuthError("Adresse e-mail invalide.")
@@ -45,15 +48,18 @@ class AuthService:
         return self._users.create(normalized_email, password_hash, normalized_role)
 
     def login(self, email: str, password: str) -> UserRecord:
+        """Authentifie un utilisateur par e-mail et mot de passe."""
         user = self._users.get_by_email(email)
         if not user or not pwd_context.verify(password, user.password_hash):
             raise AuthError("E-mail ou mot de passe incorrect.")
         return user
 
     def get_user(self, user_id: str) -> UserRecord | None:
+        """Retourne un utilisateur par son identifiant, ou ``None`` s'il n'existe pas."""
         return self._users.get_by_id(user_id)
 
     def ensure_bootstrap_admin(self) -> None:
+        """Crée le compte admin initial au premier démarrage s'il n'existe pas encore."""
         email = settings.bootstrap_admin_email.strip().lower()
         if self._users.get_by_email(email):
             return
@@ -63,6 +69,7 @@ class AuthService:
 
     @staticmethod
     def create_access_token(user: UserRecord) -> str:
+        """Génère un JWT signé contenant l'id, l'e-mail et le rôle de l'utilisateur."""
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.jwt_expire_minutes
         )
@@ -80,6 +87,7 @@ class AuthService:
 
     @staticmethod
     def decode_access_token(token: str) -> dict:
+        """Décode et valide un JWT ; lève une exception si le jeton est invalide."""
         return jwt.decode(
             token,
             settings.jwt_secret,

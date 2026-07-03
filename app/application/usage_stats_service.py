@@ -20,6 +20,11 @@ class UsageStatsService:
         self._feedback = FeedbackRepository(db)
 
     def get_stats(self, include_role_breakdown: bool = False) -> UsageStatsResponse:
+        """
+        Calcule les statistiques d'usage de la plateforme.
+
+        Si ``include_role_breakdown`` est vrai (admin), inclut la répartition par rôle.
+        """
         total_users = self._users.count()
         total, positive, negative, _ = self._feedback.stats(limit=0)
 

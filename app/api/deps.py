@@ -15,4 +15,5 @@ def get_gateway_service(
     ingestion_client: IngestionClient = Depends(get_ingestion_client),
     search_client: SearchClient = Depends(get_search_client),
 ) -> GatewayService:
+    """Injecte ``GatewayService`` avec les clients HTTP downstream."""
     return GatewayService(ingestion_client, search_client)

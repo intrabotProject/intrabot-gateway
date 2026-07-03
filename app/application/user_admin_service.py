@@ -13,15 +13,19 @@ class UserAdminError(Exception):
 
 
 class UserAdminService:
+    """Gestion des comptes utilisateurs par l'administrateur."""
+
     def __init__(self, db: Session) -> None:
         self._users = UserRepository(db)
 
     def list_users(self) -> list[UserRecord]:
+        """Liste tous les utilisateurs inscrits, du plus récent au plus ancien."""
         return self._users.list_all()
 
     def update_role(
         self, user_id: str, role: str, actor_id: str | None
     ) -> UserRecord:
+        """Modifie le rôle d'un utilisateur (interdit de modifier son propre rôle)."""
         if actor_id and user_id == actor_id:
             raise UserAdminError("Vous ne pouvez pas modifier votre propre rôle.")
 

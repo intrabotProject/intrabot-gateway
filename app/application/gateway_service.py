@@ -32,10 +32,17 @@ class GatewayService:
     """
 
     def __init__(self, ingestion_client: IngestionClient, search_client: SearchClient) -> None:
+        """Injecte les clients HTTP vers ingestion et search."""
         self._ingestion = ingestion_client
         self._search = search_client
 
     async def search(self, request: SearchRequest, user_role: UserRole) -> SearchResponse:
+        """
+        Interroge le pipeline RAG en filtrant par catégories autorisées.
+
+        Enrichit la requête avec ``allowed_categories`` selon le rôle,
+        puis délègue l'appel au service search.
+        """
         payload = request.model_dump()
         payload["allowed_categories"] = get_allowed_categories(user_role)
 
@@ -51,19 +58,23 @@ class GatewayService:
         return SearchResponse.model_validate(result)
 
     async def list_documents_for_role(self, user_role: UserRole) -> list[DocumentSummary]:
+        """Retourne les documents dont la catégorie est accessible au rôle donné."""
         allowed = set(get_allowed_categories(user_role))
         documents = await self.list_documents()
         return [doc for doc in documents if doc.category in allowed]
 
     async def ingest(self) -> IngestResponse:
+        """Déclenche l'ingestion batch de tous les documents du dossier source."""
         result = await self._ingestion.ingest()
         return IngestResponse.model_validate(result)
 
     async def list_documents(self) -> list[DocumentSummary]:
+        """Liste l'ensemble du corpus (sans filtre de rôle — usage admin)."""
         result = await self._ingestion.list_documents()
         return [DocumentSummary.model_validate(item) for item in result]
 
     async def collection_stats(self) -> CollectionStats:
+        """Retourne les statistiques de la collection ChromaDB."""
         result = await self._ingestion.collection_stats()
         return CollectionStats.model_validate(result)
 
@@ -74,6 +85,7 @@ class GatewayService:
         content_type: str,
         category: str = "public",
     ) -> DocumentSummary:
+        """Upload et indexe immédiatement un document (route admin)."""
         result = await self._ingestion.upload_document(
             filename,
             content,
@@ -87,14 +99,17 @@ class GatewayService:
         source: str,
         category: str,
     ) -> DocumentSummary:
+        """Modifie la catégorie d'un document et le réindexe."""
         result = await self._ingestion.update_document_category(source, category)
         return DocumentSummary.model_validate(result)
 
     async def delete_document(self, source: str) -> DeleteDocumentResponse:
+        """Supprime un document du disque et de ChromaDB."""
         result = await self._ingestion.delete_document(source)
         return DeleteDocumentResponse.model_validate(result)
 
     async def reindex_document(self, source: str) -> ReindexDocumentResponse:
+        """Réindexe un document existant dans ChromaDB."""
         result = await self._ingestion.reindex_document(source)
         return ReindexDocumentResponse.model_validate(result)
 
@@ -106,28 +121,34 @@ class GatewayService:
         category: str,
         submitted_by: str,
     ) -> StagingDocumentSummary:
+        """Soumet un document en zone de staging (validation admin requise)."""
         result = await self._ingestion.submit_document(
             filename, content, content_type, category, submitted_by
         )
         return StagingDocumentSummary.model_validate(result)
 
     async def list_staging(self) -> list[StagingDocumentSummary]:
+        """Liste les documents en attente de validation admin."""
         result = await self._ingestion.list_staging()
         return [StagingDocumentSummary.model_validate(item) for item in result]
 
     async def count_staging(self) -> StagingCountResponse:
+        """Retourne le nombre de documents en staging."""
         result = await self._ingestion.count_staging()
         return StagingCountResponse.model_validate(result)
 
     async def approve_staging(self, source: str) -> DocumentSummary:
+        """Approuve un document en staging et lance son indexation."""
         result = await self._ingestion.approve_staging(source)
         return DocumentSummary.model_validate(result)
 
     async def reject_staging(self, source: str) -> RejectStagingResponse:
+        """Rejette et supprime un document en staging."""
         result = await self._ingestion.reject_staging(source)
         return RejectStagingResponse.model_validate(result)
 
     async def health(self) -> HealthResponse:
+        """Vérifie la disponibilité d'ingestion et search ; agrège le statut global."""
         ingestion_status = await self._probe_service(self._ingestion.health)
         search_status = await self._probe_service(self._search.health)
 
@@ -140,6 +161,7 @@ class GatewayService:
 
     @staticmethod
     async def _probe_service(probe: Callable[[], Awaitable[object]]) -> str:
+        """Appelle un endpoint /health aval et retourne ``ok`` ou ``error``."""
         try:
             await probe()
             return "ok"

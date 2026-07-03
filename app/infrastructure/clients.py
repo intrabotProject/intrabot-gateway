@@ -11,7 +11,7 @@ from app.core.config import settings
 
 
 class DownstreamError(Exception):
-    """Erreur renvoyée par un service aval (ingestion ou search)."""
+    """Erreur HTTP renvoyée par ingestion ou search."""
 
     def __init__(self, service: str, status_code: int, detail: str):
         self.service = service
@@ -21,7 +21,7 @@ class DownstreamError(Exception):
 
 
 class _BaseClient:
-    """Factorise les appels HTTP vers un microservice."""
+    """Factorise les appels HTTP GET/POST vers un microservice aval."""
 
     def __init__(self, service_name: str, base_url: str, timeout: float) -> None:
         self._service_name = service_name
@@ -67,7 +67,7 @@ class _BaseClient:
 
 
 class IngestionClient(_BaseClient):
-    """Proxy HTTP vers intrabot-ingestion (:8001)."""
+    """Client HTTP vers intrabot-ingestion (:8001)."""
 
     def __init__(self, base_url: str, timeout: float) -> None:
         super().__init__("ingestion", base_url, timeout)
@@ -153,7 +153,7 @@ class IngestionClient(_BaseClient):
 
 
 class SearchClient(_BaseClient):
-    """Proxy HTTP vers intrabot-search (:8002)."""
+    """Client HTTP vers intrabot-search (:8002)."""
 
     def __init__(self, base_url: str, timeout: float) -> None:
         super().__init__("search", base_url, timeout)
@@ -163,8 +163,10 @@ class SearchClient(_BaseClient):
 
 
 def get_ingestion_client() -> IngestionClient:
+    """Fabrique un client ingestion configuré depuis ``settings``."""
     return IngestionClient(settings.ingestion_service_url, settings.http_timeout)
 
 
 def get_search_client() -> SearchClient:
+    """Fabrique un client search configuré depuis ``settings``."""
     return SearchClient(settings.search_service_url, settings.http_timeout)

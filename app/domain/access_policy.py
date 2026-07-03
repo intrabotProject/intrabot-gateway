@@ -56,6 +56,7 @@ ROLE_CATEGORIES: dict[UserRole, tuple[DocumentCategory, ...]] = {
 
 
 def normalize_user_role(raw: str) -> UserRole:
+    """Valide et normalise un rôle utilisateur (minuscules, liste autorisée)."""
     normalized = raw.strip().lower()
     if normalized not in USER_ROLES:
         raise ValueError(
@@ -65,4 +66,5 @@ def normalize_user_role(raw: str) -> UserRole:
 
 
 def get_allowed_categories(role: UserRole) -> list[str]:
+    """Retourne les catégories documentaires accessibles pour un rôle donné."""
     return list(ROLE_CATEGORIES[role])

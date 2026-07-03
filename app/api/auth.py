@@ -41,6 +41,7 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> AuthenticatedUser:
+    """Dépendance FastAPI : extrait et valide l'utilisateur depuis le JWT Bearer."""
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentification requise.")
 
@@ -62,6 +63,7 @@ async def get_current_user(
 async def get_user_role(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> UserRole:
+    """Dépendance FastAPI : retourne le rôle de l'utilisateur connecté."""
     return current_user.role
 
 
