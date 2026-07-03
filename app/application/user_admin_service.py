@@ -1,4 +1,4 @@
-"""Gestion des comptes utilisateurs (admin)."""
+"""Gestion des comptes utilisateurs par l'administrateur."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ from app.infrastructure.user_repository import UserRecord, UserRepository
 
 
 class UserAdminError(Exception):
-    pass
+    """Erreur métier de gestion utilisateur (rôle, auto-modification)."""
 
 
 class UserAdminService:
-    """Gestion des comptes utilisateurs par l'administrateur."""
+    """Liste et modification des rôles utilisateurs (routes /admin/users)."""
 
     def __init__(self, db: Session) -> None:
         self._users = UserRepository(db)
@@ -25,7 +25,12 @@ class UserAdminService:
     def update_role(
         self, user_id: str, role: str, actor_id: str | None
     ) -> UserRecord:
-        """Modifie le rôle d'un utilisateur (interdit de modifier son propre rôle)."""
+        """
+        Modifie le rôle d'un utilisateur.
+
+        Interdit de modifier son propre rôle (si actor_id fourni via JWT).
+        Rôles assignables : REGISTERABLE_ROLES + admin.
+        """
         if actor_id and user_id == actor_id:
             raise UserAdminError("Vous ne pouvez pas modifier votre propre rôle.")
 

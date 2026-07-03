@@ -1,4 +1,9 @@
-"""Persistance des retours utilisateur sur les réponses du chat."""
+"""
+Persistance des retours utilisateur sur les réponses chat (table ``message_feedback``).
+
+Un couple (user_id, message_id) est mis à jour en upsert si un retour existe déjà.
+Valeurs possibles : ``up`` (👍) ou ``down`` (👎).
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,8 @@ from app.infrastructure.database import Base
 
 
 class FeedbackRecord(Base):
+    """Modèle ORM d'un retour utilisateur sur un message chat."""
+
     __tablename__ = "message_feedback"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -24,6 +31,8 @@ class FeedbackRecord(Base):
 
 
 class FeedbackRepository:
+    """Accès aux retours chat en base SQLite."""
+
     def __init__(self, db: Session) -> None:
         self._db = db
 
@@ -35,6 +44,7 @@ class FeedbackRepository:
         question: str | None,
         answer: str | None,
     ) -> FeedbackRecord:
+        """Crée ou met à jour le feedback d'un utilisateur sur un message."""
         existing = self._db.scalar(
             select(FeedbackRecord).where(
                 FeedbackRecord.user_id == user_id,
@@ -64,6 +74,7 @@ class FeedbackRepository:
         return record
 
     def stats(self, limit: int = 20) -> tuple[int, int, int, list[FeedbackRecord]]:
+        """Retourne (total, positifs, négatifs, derniers retours limités)."""
         rows = list(
             self._db.scalars(
                 select(FeedbackRecord).order_by(FeedbackRecord.created_at.desc())

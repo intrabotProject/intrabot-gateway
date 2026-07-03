@@ -1,4 +1,16 @@
-"""Inscription, connexion et émission de jetons JWT."""
+"""
+Inscription, connexion et émission de jetons JWT.
+
+Flux
+----
+1. register / login → validation → UserRepository → JWT (HS256)
+2. get_current_user (auth.py) → decode_access_token → recharge user en base
+
+Bootstrap admin
+---------------
+Au 1er démarrage, ensure_bootstrap_admin crée un compte admin si l'e-mail
+configuré (BOOTSTRAP_ADMIN_*) n'existe pas encore.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +28,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class AuthError(Exception):
-    pass
+    """Erreur métier d'authentification (e-mail, mot de passe, rôle)."""
 
 
 class AuthService:
@@ -26,7 +38,12 @@ class AuthService:
         self._users = UserRepository(db)
 
     def register(self, email: str, password: str, role: str) -> UserRecord:
-        """Crée un compte utilisateur avec validation e-mail, mot de passe et rôle."""
+        """
+        Crée un compte utilisateur.
+
+        Règles : e-mail valide, mot de passe ≥ 8 car., rôle dans REGISTERABLE_ROLES
+        (employee, engineer, manager, rh — pas admin).
+        """
         normalized_email = email.strip().lower()
         if not normalized_email or "@" not in normalized_email:
             raise AuthError("Adresse e-mail invalide.")
@@ -48,14 +65,14 @@ class AuthService:
         return self._users.create(normalized_email, password_hash, normalized_role)
 
     def login(self, email: str, password: str) -> UserRecord:
-        """Authentifie un utilisateur par e-mail et mot de passe."""
+        """Authentifie un utilisateur par e-mail et mot de passe (bcrypt)."""
         user = self._users.get_by_email(email)
         if not user or not pwd_context.verify(password, user.password_hash):
             raise AuthError("E-mail ou mot de passe incorrect.")
         return user
 
     def get_user(self, user_id: str) -> UserRecord | None:
-        """Retourne un utilisateur par son identifiant, ou ``None`` s'il n'existe pas."""
+        """Retourne un utilisateur par son identifiant, ou None s'il n'existe pas."""
         return self._users.get_by_id(user_id)
 
     def ensure_bootstrap_admin(self) -> None:
@@ -69,7 +86,11 @@ class AuthService:
 
     @staticmethod
     def create_access_token(user: UserRecord) -> str:
-        """Génère un JWT signé contenant l'id, l'e-mail et le rôle de l'utilisateur."""
+        """
+        Génère un JWT signé.
+
+        Claims : sub (user id), email, role, exp (JWT_EXPIRE_MINUTES).
+        """
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.jwt_expire_minutes
         )
@@ -87,7 +108,7 @@ class AuthService:
 
     @staticmethod
     def decode_access_token(token: str) -> dict:
-        """Décode et valide un JWT ; lève une exception si le jeton est invalide."""
+        """Décode et valide un JWT ; lève JWTError si invalide ou expiré."""
         return jwt.decode(
             token,
             settings.jwt_secret,

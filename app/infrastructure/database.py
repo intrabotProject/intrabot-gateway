@@ -1,4 +1,12 @@
-"""Connexion SQLite et session SQLAlchemy."""
+"""
+Connexion SQLite et session SQLAlchemy.
+
+Base locale : ``./data/users.db`` (configurable via DATABASE_URL).
+
+Tables créées au démarrage (``init_db``) :
+    users            Comptes utilisateurs (auth JWT)
+    message_feedback Retours 👍/👎 sur les réponses chat
+"""
 
 from __future__ import annotations
 
@@ -11,7 +19,7 @@ from app.core.config import settings
 
 
 class Base(DeclarativeBase):
-    pass
+    """Base déclarative SQLAlchemy pour les modèles ORM du gateway."""
 
 
 engine = create_engine(
@@ -32,7 +40,7 @@ def init_db() -> None:
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Fournit une session SQLAlchemy par requête HTTP (fermée automatiquement)."""
+    """Dépendance FastAPI : session SQLAlchemy par requête, fermée automatiquement."""
     db = SessionLocal()
     try:
         yield db

@@ -1,4 +1,12 @@
-"""Inscription, connexion et profil utilisateur."""
+"""
+Inscription, connexion et profil utilisateur.
+
+Routes
+------
+POST /auth/register  Crée un compte, retourne JWT + profil
+POST /auth/login     Authentifie, retourne JWT + profil
+GET  /auth/me        Profil de l'utilisateur connecté (JWT requis)
+"""
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -18,6 +26,7 @@ async def register(
     body: RegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
+    """Inscription : e-mail, mot de passe (≥ 8 car.), rôle (hors admin). Retourne un JWT."""
     try:
         user = auth_service.register(body.email, body.password, body.role)
     except AuthError as exc:
@@ -32,6 +41,7 @@ async def login(
     body: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
+    """Connexion par e-mail / mot de passe. Retourne un JWT."""
     try:
         user = auth_service.login(body.email, body.password)
     except AuthError as exc:
@@ -43,6 +53,7 @@ async def login(
 
 @router.get("/me", response_model=UserResponse, summary="Profil connecté")
 async def me(current_user: AuthenticatedUser = Depends(get_current_user)) -> UserResponse:
+    """Retourne id, e-mail et rôle de l'utilisateur authentifié."""
     return UserResponse(
         id=current_user.id,
         email=current_user.email,

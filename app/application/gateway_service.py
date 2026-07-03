@@ -1,4 +1,11 @@
-"""Couche application du gateway : délégation vers ingestion et search."""
+"""
+Couche application du gateway : délégation vers ingestion et search.
+
+GatewayService est l'orchestrateur BFF central. Il ne contient aucune logique RAG :
+il enrichit les requêtes (allowed_categories, validation source_filter),
+appelle les microservices via IngestionClient / SearchClient,
+et normalise les réponses Pydantic pour le frontend.
+"""
 
 from __future__ import annotations
 
@@ -27,12 +34,13 @@ class GatewayService:
     """
     Orchestrateur BFF (Backend For Frontend).
 
-    Ne contient aucune logique RAG : il valide les entrées, appelle les
-    microservices spécialisés et normalise les réponses pour le frontend.
+    Responsabilités :
+    - Proxy transparent vers ingestion (documents, staging, ingest)
+    - Proxy vers search avec filtrage par rôle (allowed_categories)
+    - Santé agrégée (gateway + ingestion + search)
     """
 
     def __init__(self, ingestion_client: IngestionClient, search_client: SearchClient) -> None:
-        """Injecte les clients HTTP vers ingestion et search."""
         self._ingestion = ingestion_client
         self._search = search_client
 
@@ -40,8 +48,8 @@ class GatewayService:
         """
         Interroge le pipeline RAG en filtrant par catégories autorisées.
 
-        Enrichit la requête avec ``allowed_categories`` selon le rôle,
-        puis délègue l'appel au service search.
+        Enrichit le payload avec ``allowed_categories`` selon le rôle.
+        Si ``source_filter`` pointe vers un document inaccessible, il est ignoré.
         """
         payload = request.model_dump()
         payload["allowed_categories"] = get_allowed_categories(user_role)
@@ -148,7 +156,11 @@ class GatewayService:
         return RejectStagingResponse.model_validate(result)
 
     async def health(self) -> HealthResponse:
-        """Vérifie la disponibilité d'ingestion et search ; agrège le statut global."""
+        """
+        Vérifie la disponibilité d'ingestion et search.
+
+        Retourne status ``ok`` si les deux services répondent, sinon ``degraded``.
+        """
         ingestion_status = await self._probe_service(self._ingestion.health)
         search_status = await self._probe_service(self._search.health)
 

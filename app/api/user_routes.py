@@ -1,4 +1,13 @@
-"""Routes utilisateur — soumission de documents pour validation admin."""
+"""
+Routes utilisateur — soumission de documents pour validation admin.
+
+Route
+-----
+POST /user/documents/submit  Soumet un fichier en staging (JWT requis)
+
+La catégorie doit être autorisée pour le rôle (voir access_policy.py).
+Flux : submit → staging (ingestion) → admin approve → indexation ChromaDB.
+"""
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
@@ -21,7 +30,9 @@ async def submit_document(
 ) -> StagingDocumentSummary:
     """
     Soumet un document pour validation par l'admin.
-    La catégorie doit être accessible selon le rôle de l'utilisateur.
+
+    multipart/form-data : file (obligatoire), category (défaut public).
+    Retourne 403 si la catégorie n'est pas autorisée pour le rôle.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")

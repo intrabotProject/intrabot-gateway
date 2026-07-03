@@ -1,4 +1,14 @@
-"""Authentification JWT, rôles utilisateur et accès admin."""
+"""
+Authentification JWT, rôles utilisateur et accès admin.
+
+Dépendances FastAPI
+-------------------
+get_current_user       Extrait l'utilisateur depuis Authorization: Bearer <token>
+get_user_role          Retourne le rôle (pour filtrage documents/recherche)
+require_admin_access   JWT admin OU header X-API-Key (routes /admin/*)
+
+JWT payload : sub (user id), email, role, exp.
+"""
 
 from __future__ import annotations
 
@@ -20,12 +30,15 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 @dataclass(frozen=True)
 class AuthenticatedUser:
+    """Utilisateur authentifié extrait du JWT et rechargé depuis SQLite."""
+
     id: str
     email: str
     role: UserRole
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
+    """Dépendance FastAPI : instancie AuthService avec une session DB."""
     return AuthService(db)
 
 
@@ -41,7 +54,11 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> AuthenticatedUser:
-    """Dépendance FastAPI : extrait et valide l'utilisateur depuis le JWT Bearer."""
+    """
+    Dépendance FastAPI : extrait et valide l'utilisateur depuis le JWT Bearer.
+
+    Lève HTTP 401 si token absent, invalide, expiré ou utilisateur introuvable.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentification requise.")
 
@@ -73,7 +90,11 @@ async def require_admin_access(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> None:
     """
-    Accès admin : compte avec rôle admin (JWT) ou clé API legacy (scripts / dev).
+    Garde d'accès admin pour toutes les routes /admin/*.
+
+    Accepte :
+    1. JWT d'un utilisateur avec rôle ``admin`` en base
+    2. Header X-API-Key égal à ADMIN_API_KEY (scripts, dev, CI)
     """
     if credentials:
         try:

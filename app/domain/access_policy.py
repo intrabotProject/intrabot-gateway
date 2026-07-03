@@ -1,4 +1,20 @@
-"""Politique d'accès : rôles utilisateur et catégories documentaires."""
+"""
+Politique d'accès documentaire : rôles utilisateur ↔ catégories de documents.
+
+Chaque document indexé possède une catégorie. Chaque utilisateur possède un rôle.
+Le gateway filtre documents et recherches selon la matrice ROLE_CATEGORIES.
+
+Matrice rôle → catégories
+-------------------------
+employee   → public
+engineer   → public, engineering
+manager    → public, engineering, gouvernance
+rh         → public, rh
+admin      → toutes (public, engineering, rh, gouvernance, finance)
+
+Exposition API : GET /api/v1/access (sans authentification).
+Application  : GatewayService.search, list_documents_for_role, user_routes.submit_document.
+"""
 
 from typing import Literal
 
@@ -56,7 +72,7 @@ ROLE_CATEGORIES: dict[UserRole, tuple[DocumentCategory, ...]] = {
 
 
 def normalize_user_role(raw: str) -> UserRole:
-    """Valide et normalise un rôle utilisateur (minuscules, liste autorisée)."""
+    """Valide et normalise un rôle utilisateur (minuscules, liste USER_ROLES)."""
     normalized = raw.strip().lower()
     if normalized not in USER_ROLES:
         raise ValueError(

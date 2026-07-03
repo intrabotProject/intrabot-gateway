@@ -15,5 +15,10 @@ def get_gateway_service(
     ingestion_client: IngestionClient = Depends(get_ingestion_client),
     search_client: SearchClient = Depends(get_search_client),
 ) -> GatewayService:
-    """Injecte ``GatewayService`` avec les clients HTTP downstream."""
+    """
+    Injecte GatewayService avec les clients HTTP downstream.
+
+    Utilisé comme dépendance FastAPI sur toutes les routes qui proxy
+    vers ingestion ou search.
+    """
     return GatewayService(ingestion_client, search_client)

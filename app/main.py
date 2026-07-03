@@ -1,8 +1,23 @@
 """
 Point d'entrée FastAPI du gateway IntraBot.
 
-Le gateway est un BFF : il expose une API unique au frontend, gère le CORS,
-protège les routes admin et délègue le travail aux services ingestion et search.
+Rôle
+----
+BFF (Backend For Frontend) : API unique pour le frontend, CORS, auth JWT,
+proxy vers ingestion (:8001) et search (:8002).
+
+Démarrage (lifespan)
+--------------------
+1. Crée le dossier parent de la base SQLite (``./data/`` par défaut).
+2. ``init_db()`` — tables ``users`` et ``message_feedback``.
+3. ``AuthService.ensure_bootstrap_admin()`` — compte admin initial si absent.
+
+Routers montés
+--------------
+- ``auth_router``   → ``/auth/*``
+- ``router``        → routes publiques et RAG
+- ``admin_router``  → ``/admin/*``
+- ``user_router``   → ``/user/*``
 """
 
 from contextlib import asynccontextmanager
@@ -22,6 +37,7 @@ from app.infrastructure.database import SessionLocal, init_db
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """Initialise la base SQLite et le compte admin bootstrap au démarrage."""
     db_path = settings.database_url.removeprefix("sqlite:///")
     if db_path and not db_path.startswith(":"):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,9 @@
-"""Agrégation des statistiques d'usage de la plateforme."""
+"""
+Agrégation des statistiques d'usage de la plateforme.
+
+Combine UserRepository et FeedbackRepository pour produire UsageStatsResponse.
+La répartition users_by_role n'est incluse que pour les admins.
+"""
 
 from __future__ import annotations
 
@@ -10,10 +15,7 @@ from app.infrastructure.user_repository import UserRepository
 
 
 class UsageStatsService:
-    """
-    Combine les données utilisateurs et feedbacks pour produire
-    les statistiques d'usage exposées aux utilisateurs connectés.
-    """
+    """Statistiques d'usage exposées via GET /api/v1/stats/usage."""
 
     def __init__(self, db: Session) -> None:
         self._users = UserRepository(db)
@@ -21,9 +23,10 @@ class UsageStatsService:
 
     def get_stats(self, include_role_breakdown: bool = False) -> UsageStatsResponse:
         """
-        Calcule les statistiques d'usage de la plateforme.
+        Calcule les statistiques d'usage.
 
-        Si ``include_role_breakdown`` est vrai (admin), inclut la répartition par rôle.
+        include_role_breakdown=True (admin) ajoute users_by_role.
+        satisfaction_rate = % de retours positifs (0 si aucun feedback).
         """
         total_users = self._users.count()
         total, positive, negative, _ = self._feedback.stats(limit=0)

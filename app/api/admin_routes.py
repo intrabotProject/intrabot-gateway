@@ -1,4 +1,31 @@
-"""Routes d'administration — proxy vers ingestion, protégées par JWT admin ou X-API-Key."""
+"""
+Routes d'administration — proxy vers ingestion + gestion locale (users, feedback).
+
+Auth requise : JWT admin OU header X-API-Key (voir auth.require_admin_access).
+
+Documents (proxy ingestion)
+---------------------------
+GET    /admin/documents                        Corpus complet
+POST   /admin/documents/upload                 Upload + indexation
+PATCH  /admin/documents/{source}/category      Changer catégorie
+DELETE /admin/documents/{source}               Supprimer
+POST   /admin/documents/{source}/reindex       Réindexer
+GET    /admin/collection/stats                 Stats ChromaDB
+POST   /admin/ingest                           Ingestion batch
+
+Staging (proxy ingestion)
+-------------------------
+GET    /admin/staging                          Liste en attente
+GET    /admin/staging/count                    Compteur
+POST   /admin/staging/{source}/approve         Approuver + indexer
+DELETE /admin/staging/{source}                 Rejeter
+
+Utilisateurs et feedback (SQLite local)
+---------------------------------------
+GET    /admin/users                            Liste utilisateurs
+PATCH  /admin/users/{user_id}/role             Modifier rôle
+GET    /admin/feedback/stats                   Stats retours chat
+"""
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -50,6 +77,7 @@ async def _resolve_actor_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(_admin_bearer),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> str | None:
+    """Extrait l'ID admin depuis le JWT (None si accès par X-API-Key)."""
     if not credentials:
         return None
     try:
@@ -60,10 +88,13 @@ async def _resolve_actor_id(
 
 
 class UpdateDocumentCategoryBody(BaseModel):
+    """Corps PATCH /admin/documents/{source}/category."""
+
     category: str
 
 
 def _downstream_http_error(exc: DownstreamError) -> HTTPException:
+    """Convertit DownstreamError : 404 si aval 404, sinon 502."""
     status_code = 404 if exc.status_code == 404 else 502
     return HTTPException(status_code=status_code, detail=str(exc))
 
@@ -72,6 +103,7 @@ def _downstream_http_error(exc: DownstreamError) -> HTTPException:
 async def list_documents(
     service: GatewayService = Depends(get_gateway_service),
 ) -> list[DocumentSummary]:
+    """Liste tout le corpus indexé (sans filtre de rôle)."""
     try:
         return await service.list_documents()
     except DownstreamError as exc:
@@ -84,6 +116,7 @@ async def upload_document(
     category: str = Form(default="public"),
     service: GatewayService = Depends(get_gateway_service),
 ) -> DocumentSummary:
+    """Upload multipart et indexation immédiate dans ChromaDB."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
 
@@ -105,6 +138,7 @@ async def update_document_category(
     body: UpdateDocumentCategoryBody,
     service: GatewayService = Depends(get_gateway_service),
 ) -> DocumentSummary:
+    """Modifie la catégorie d'un document et le réindexe."""
     try:
         return await service.update_document_category(source, body.category)
     except DownstreamError as exc:
@@ -116,6 +150,7 @@ async def delete_document(
     source: str,
     service: GatewayService = Depends(get_gateway_service),
 ) -> DeleteDocumentResponse:
+    """Supprime un document du disque et de ChromaDB."""
     try:
         return await service.delete_document(source)
     except DownstreamError as exc:
@@ -127,6 +162,7 @@ async def reindex_document(
     source: str,
     service: GatewayService = Depends(get_gateway_service),
 ) -> ReindexDocumentResponse:
+    """Réindexe un document existant dans ChromaDB."""
     try:
         return await service.reindex_document(source)
     except DownstreamError as exc:
@@ -137,6 +173,7 @@ async def reindex_document(
 async def collection_stats(
     service: GatewayService = Depends(get_gateway_service),
 ) -> CollectionStats:
+    """Statistiques de la collection vectorielle ChromaDB."""
     try:
         return await service.collection_stats()
     except DownstreamError as exc:
@@ -147,6 +184,7 @@ async def collection_stats(
 async def admin_ingest(
     service: GatewayService = Depends(get_gateway_service),
 ) -> IngestResponse:
+    """Déclenche l'ingestion batch de tous les documents source."""
     try:
         return await service.ingest()
     except DownstreamError as exc:
@@ -157,6 +195,7 @@ async def admin_ingest(
 async def list_users(
     user_admin: UserAdminService = Depends(get_user_admin_service),
 ) -> list[AdminUserListItem]:
+    """Liste tous les utilisateurs inscrits (données SQLite locales)."""
     return [
         AdminUserListItem(
             id=user.id,
@@ -175,6 +214,11 @@ async def update_user_role(
     actor_id: str | None = Depends(_resolve_actor_id),
     user_admin: UserAdminService = Depends(get_user_admin_service),
 ) -> UserResponse:
+    """
+    Modifie le rôle d'un utilisateur.
+
+    Interdit de modifier son propre rôle si authentifié par JWT.
+    """
     try:
         user = user_admin.update_role(user_id, body.role, actor_id)
     except UserAdminError as exc:
@@ -187,6 +231,7 @@ async def update_user_role(
 async def list_staging(
     service: GatewayService = Depends(get_gateway_service),
 ) -> list[StagingDocumentSummary]:
+    """Liste les documents soumis en attente de validation."""
     try:
         return await service.list_staging()
     except DownstreamError as exc:
@@ -197,6 +242,7 @@ async def list_staging(
 async def count_staging(
     service: GatewayService = Depends(get_gateway_service),
 ) -> StagingCountResponse:
+    """Retourne le nombre de documents en staging."""
     try:
         return await service.count_staging()
     except DownstreamError as exc:
@@ -208,6 +254,7 @@ async def approve_staging(
     source: str,
     service: GatewayService = Depends(get_gateway_service),
 ) -> DocumentSummary:
+    """Approuve un document staging et lance son indexation."""
     try:
         return await service.approve_staging(source)
     except DownstreamError as exc:
@@ -219,6 +266,7 @@ async def reject_staging(
     source: str,
     service: GatewayService = Depends(get_gateway_service),
 ) -> RejectStagingResponse:
+    """Rejette et supprime un document en staging."""
     try:
         return await service.reject_staging(source)
     except DownstreamError as exc:
@@ -229,6 +277,7 @@ async def reject_staging(
 async def feedback_stats(
     feedback_service: FeedbackService = Depends(get_feedback_service),
 ) -> FeedbackStatsResponse:
+    """Statistiques des retours utilisateurs (total, positifs, négatifs, récents)."""
     total, positive, negative, recent_rows = feedback_service.stats()
     return FeedbackStatsResponse(
         total=total,
